@@ -6,11 +6,7 @@ This R project explores the 2022-2023 NBA season data to identify the key factor
 - **Player Attributes**: Investigating how factors like field goal percentage, assists, rebounds, and usage rate affect PPG.
 - **Statistical Methods**: Regression models to predict PPG based on selected player features.
 - **Correlation Analysis**: Identifying relationships between different metrics and PPG using correlation tests.
-- **Visualization**: Using `ggplot2` for visualizing trends and patterns in player performance.
-
-## Technologies Used:
-- R (dplyr, ggplot2, tidyr)
-- Statistical Methods: Correlation analysis, regression models
+- **Visualization**: Using `ggplot2` for visualizing trends and patterns in player performance
 
 ## Goals:
 To understand the statistical relationships that drive individual scoring performance and provide actionable insights for players, coaches, and analysts in the NBA.
