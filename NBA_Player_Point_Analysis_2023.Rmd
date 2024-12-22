@@ -1,0 +1,469 @@
+---
+title: "NBA Player Analysis - Player Point Production for 2022-2023 NBA Season"
+author: "Abhinav Yerramreddy"
+date: "2024-12-11"
+output:
+  pdf_document: default
+  word_document: default
+---
+
+---
+title: "NBA Player Analysis - Player Point Production for 2022-2023 NBA Season"
+author: "Abhinav Yerramreddy"
+date: "2024-12-11"
+output: word_document
+---
+
+```{r}
+# Read in dataset from Kaggle
+nba <- read.csv("2023_nba_player_stats.csv", header = TRUE, sep = ",")
+
+# Clean data
+clean_data<- nba[1:534,] #last few rows had NAs in position
+
+# Remove redundant variables
+clean_data <- clean_data[, !colnames(clean_data) %in% c("TOV","FP", "DD2", "TD3","X...")]
+
+tail(clean_data)
+
+head(clean_data)
+
+clean_data$PTS <- as.numeric(clean_data$PTS)
+
+clean_data$Min <- as.numeric(clean_data$Min)
+
+# Filter out players who played fewer than 10 games
+clean_data <- clean_data[clean_data$GP >= 10, ]
+
+# Create Response Variable PPM (Points Per Minute)
+clean_data$PPM <- ifelse(clean_data$Min == 0 | is.na(clean_data$Min), NA, clean_data$PTS / clean_data$Min)
+
+which(is.na(clean_data$PPM))
+
+mydata <- clean_data[, !colnames(clean_data) %in% c("PName","POS","Team","GP"
+                                                    , "Min", "PTS", "FGM", "FGA"
+                                                    , "X3PM", "X3PA", "FTM", "FTA", "REB")]
+
+nba <- clean_data
+
+colnames(mydata)
+
+mydata
+
+```
+
+```{r}
+
+#numerical_data <- clean_data[, !colnames(clean_data) %in% c("PName", "POS", "Team")]
+model <- lm(PPM ~ Age + GP + W + L + 
+              Min + PTS + FGM + FGA + FG. + X3PM + X3PA + X3P. 
+            + FTM + FTA + FT. + OREB + DREB + REB + AST + 
+              STL + BLK + PF,data = clean_data)
+
+
+summary(model)
+```
+
+```{r}
+library(ggplot2)
+library(reshape2)
+
+reshaped <- melt(mydata,id.vars="PPM")
+
+ggplot(reshaped) +
+  geom_jitter(aes(value, PPM, colour = variable)) +
+  geom_smooth(aes(value, PPM, colour = variable), method = "lm", se = FALSE) +
+  facet_wrap(~variable, scales = "free_x")
+```
+
+```{r}
+Rvalues <- c()  # Initialize an empty vector to store R-squared values
+
+for (i in colnames(mydata)) {
+  if (i != "PPM") 
+  {
+    model <- lm(as.formula(paste("PPM ~", i)), data = mydata)
+    Rvalues <- c(Rvalues, summary(model)$r.squared)
+  }
+}
+
+cols_new <- c("Age","W","L","FG.","X3P.","FT.","OREB","DREB","AST","STL","BLK","PF")
+
+result <- cbind(cols_new, Rvalues)
+
+result_df <- as.data.frame(result)
+colnames(result_df) <- c("Variable", "R_Squared")
+
+result_df
+```
+
+```{r}
+
+lm_initial <- lm(PPM ~ Age + W + L + FG.+ X3P. 
+            + FT. + OREB + DREB + AST + 
+              STL + BLK + PF,data = mydata)
+
+
+summary(lm_initial)
+
+```
+
+```{r}
+lm_1 <- lm(PPM ~Age + W + L + FG.+ X3P. 
+            + FT. + OREB +DREB+ AST + BLK + PF,data = mydata)
+
+
+summary(lm_1)
+```
+
+```{r}
+lm_temp <- lm(PPM ~Age + W + L + FG.+ X3P. 
+            + FT. + OREB +DREB+ AST + BLK,data = mydata)
+
+
+summary(lm_temp)
+
+
+```
+
+```{r}
+anova(lm_temp,lm_initial)
+
+```
+
+```{r}
+library(ggplot2)
+library(reshape2)
+
+library(MASS)
+
+#install.packages("car")  # If not installed already
+
+final_data <- mydata[, !colnames(mydata) %in% c("STL","PF")]
+
+# Reshape the correlation matrix into a long format
+corr_melted <- melt(cor(final_data))
+
+# Create a heatmap
+ggplot(corr_melted, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(midpoint = 0, low = "blue", high = "red", mid = "white") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+```
+
+```{r}
+library(car)
+
+vif(lm_temp)
+```
+
+```{r}
+lm_final <- lm(PPM ~Age+W+L+ FG.+ X3P. 
+            + FT. + OREB +DREB+ AST + PF,data = mydata)
+vif(lm_final)
+
+```
+
+```{r}
+
+summary(lm_final)
+
+```
+
+```{r}
+
+anova(lm_final,lm_initial)
+
+```
+
+
+```{r}
+# Plot PPM by Position
+ggplot(data = clean_data, aes(x = POS, y = PPM, fill = POS)) +
+  geom_bar(stat = "identity") +
+  labs(title = "PPM by Position", x = "Position", y = "PPM")
+```
+
+```{r}
+# Plot PPM by Team
+ggplot(data = clean_data, aes(x = PPM, y = Team, fill = Team)) +
+  geom_bar(stat = "identity") +
+  labs(title = "PPM by Team", x = "PPM", y = "Team")
+```
+
+```{r}
+# Load necessary libraries
+library(MASS)  # For Box-Cox transformation
+library(ggplot2)  # For visualization
+library(dplyr)  # For data manipulation
+
+# Apply Box-Cox transformation to determine the optimal lambda
+boxcox_result <- boxcox(PPM ~ 1, data = mydata, lambda = seq(-2, 2, 0.1), plotit = FALSE)
+
+# Extract lambda values and their corresponding log-likelihoods
+lambda_values <- boxcox_result$x
+log_likelihoods <- boxcox_result$y
+
+# Plot the Box-Cox transformation log-likelihood against lambda values
+boxcox_plot <- data.frame(lambda = lambda_values, log_likelihood = log_likelihoods)
+ggplot(boxcox_plot, aes(x = lambda, y = log_likelihood)) +
+  geom_line(color = "blue", size = 1) +
+  geom_vline(xintercept = lambda_values[which.max(log_likelihoods)], linetype = "dashed", color = "red") +
+  labs(
+    title = "Box-Cox Transformation Log-Likelihood Plot",
+    x = "Lambda",
+    y = "Log-Likelihood"
+  ) +
+  theme_minimal()
+
+# Display the optimal lambda
+lambda_optimal <- lambda_values[which.max(log_likelihoods)]
+lambda_optimal
+```
+
+```{r}
+# Plot histogram of PPM with density curve
+library(ggplot2)
+
+original_ppm_plot <- ggplot(mydata, aes(x = PPM)) +
+  # Histogram with density scaling
+  geom_histogram(aes(y = after_stat(density)), binwidth = 0.05, fill = "skyblue", color = "black", alpha = 0.7) +
+  # Overlay normal density curve
+  stat_function(
+    fun = dnorm, 
+    args = list(mean = mean(mydata$PPM, na.rm = TRUE), sd = sd(mydata$PPM, na.rm = TRUE)),
+    color = "red", size = 1
+  ) +
+  # Titles and labels
+  labs(
+    title = "Histogram of Points Per Minute (PPM) - Pre-Transformed Model",
+    x = "Points Per Minute (PPM)",
+    y = "Density"
+  ) +
+  # Styling
+  theme_minimal() +
+  theme(
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 14),
+    plot.title = element_text(size = 14, hjust = 0.5)
+  )
+
+# Print the plot
+print(original_ppm_plot)
+```
+
+```{r}
+# Create a QQ plot for the Pre-Transformed Model for 'PPM' variable
+qqnorm(mydata$PPM, 
+       main = "QQ Plot of Pre-Transformed Model PPM Scored", 
+       xlab = "Theoretical Quantiles", 
+       ylab = "Sample Quantiles", 
+       col = "blue", 
+       pch = 16)
+qqline(mydata$PPM, col = "red", lwd = 2)
+```
+
+```{r}
+# Load necessary libraries
+library(lmtest)
+library(MASS)
+library(ggplot2)
+
+# Apply Box-Cox Transformation to Dependent Variable (PPM) by Optimal Lambda Value
+mydata$PPPM_transformed <- mydata$PPM^(0.2)
+
+# Transformed Model with Log Transformations
+# Adding 1 to avoid log(0)
+# Log Transformations
+mydata$FG._log <- (log(mydata$FG. + 1)^2)
+mydata$W_log <- (log(mydata$W + 1)^2)
+mydata$L_log <- (log(mydata$L + 1)^2)
+mydata$Age_log <- (log(mydata$Age + 1)^2)
+mydata$OREB_log <- (log(mydata$OREB + 1)^2)
+mydata$DREB_log <- (log(mydata$DREB + 1)^2)
+mydata$AST_log <- (log(mydata$AST + 1)^2)
+
+# Fit the Transformed Model
+model_transformed <- lm(
+  PPPM_transformed ~  FG._log + W_log + L_log + Age_log + (FG._log)^2 + OREB_log + DREB_log + AST_log,
+  data = mydata
+)
+
+# Plot Residual Analysis - Fitted vs. Studentized Residuals
+
+# Set up side-by-side plotting
+par(mfrow = c(1, 2))  # 1 row, 2 columns
+
+# Plot for lm_final (pre-transformed)
+plot(
+  fitted(lm_final), rstudent(lm_final),
+  main = "Pre-Transformed Model: Fitted vs. Residuals",
+  xlab = "Fitted Values", ylab = "Studentized Residuals",
+  col = "blue", pch = 16,
+  xlim = c(min(fitted(lm_final)), max(fitted(lm_final))), cex.main = 0.9
+)
+abline(h = 0, col = "red", lwd = 2)
+
+# Plot for Transformed Model
+plot(
+  fitted(model_transformed), rstudent(model_transformed),
+  main = "Transformed Model: Fitted vs. Residuals",
+  xlab = "Fitted Values", ylab = "Studentized Residuals",
+  col = "green", pch = 16,
+  xlim = c(min(fitted(model_transformed)), max(fitted(model_transformed))), cex.main = 0.9
+)
+abline(h = 0, col = "red", lwd = 2)
+
+# Extract residuals from the transformed model
+residuals_transformed <- rstudent(model_transformed)
+
+# QQ Plot of residuals
+qqnorm(residuals_transformed, main = "QQ Plot of Transformed Model Residuals", cex.main = 0.9)
+qqline(residuals_transformed, col = "red")
+
+# Histogram with density scaling
+hist(residuals_transformed, 
+     main = "Histogram of Residuals (Transformed Model)", 
+     xlab = "Residuals", 
+     col = "lightblue", 
+     breaks = 20, 
+     freq = FALSE, 
+     cex.main = 0.9)
+
+# Density of Histogram Curve
+plot(density(residuals_transformed), main = "Density Curve of Residuals", col = "red", lwd = 2, cex.main = 0.9)
+
+# Summary of transformed model
+summary(model_transformed)
+```
+
+```{r}
+
+dfbetas_values <- dfbetas(model_transformed)
+
+# Leverage vs. Residuals Plot 
+influence_plot <- influence.measures(model_transformed)
+influence_plot_df <- influence_plot$infmat
+
+# Plot 
+par(mfrow=c(2,2))  
+
+# DFBETAs plots 
+for(i in 1:ncol(dfbetas_values)) {
+  plot(dfbetas_values[, i], 
+       main = paste("DFBETAs for Coefficient",
+                    colnames(dfbetas_values)[i]), 
+       xlab = "Observation", 
+       ylab = "DFBETAs", 
+       pch = 16, col = "blue")
+  abline(h = c(-2, 2), col = "red", lwd = 2)
+}
+
+cat("\nDFBETAs (Significant Influence on Coefficients):\n")
+
+influential_dfbetas <- which(abs(dfbetas_values) > 2)
+print(influential_dfbetas)
+
+```
+
+
+```{r}
+# Residuals from transformed model
+r_student_residuals <- rstudent(model_transformed)
+
+# Standardized residuals
+standardized_residuals <- rstandard(model_transformed)
+
+# Studentized residuals 
+studentized_residuals <- studres(model_transformed)
+
+# Plot
+par(mfrow=c(2,2))  # Plot in a 2x2 layout
+
+# R-Student Residuals
+plot(r_student_residuals, 
+     main = "R-Student Residuals", 
+     xlab = "Observation", 
+     ylab = "R-Student Residuals", 
+     pch = 16, col = "blue")
+abline(h = c(-3, 3), col = "red", lwd = 2)
+
+# Standardized Residuals
+plot(standardized_residuals, 
+     main = "Standardized Residuals", 
+     xlab = "Observation", 
+     ylab = "Standardized Residuals", 
+     pch = 16, col = "blue")
+abline(h = c(-3, 3), col = "red", lwd = 2)  
+
+# Studentized Residuals
+plot(studentized_residuals, 
+     main = "Studentized Residuals", 
+     xlab = "Observation", 
+     ylab = "Studentized Residuals", 
+     pch = 16, col = "blue")
+abline(h = c(-3, 3), col = "red", lwd = 2)  
+
+# Identify observations with large residuals
+outliers_r_student <- which(abs(r_student_residuals) > 3)
+outliers_standardized <- which(abs(standardized_residuals) > 3)
+outliers_studentized <- which(abs(studentized_residuals) > 3)
+
+# Print the outlier points
+cat("Outliers based on R-Student Residuals:\n")
+print(outliers_r_student)
+
+cat("\nOutliers based on Standardized Residuals:\n")
+print(outliers_standardized)
+
+cat("\nOutliers based on Studentized Residuals:\n")
+print(outliers_studentized)
+```
+
+```{r}
+
+cooks_distance <- cooks.distance(model_transformed)
+hat_values <- lm.influence(model_transformed)$hat
+
+par(mfrow = c(2, 1), mar = c(4, 4, 2, 1), oma = c(2, 2, 2, 1))  
+
+# Plot Cook's Distance
+plot(cooks_distance, 
+     main = "Cook's Distance", 
+     xlab = "Index", 
+     ylab = "Cook's Distance", 
+     pch = 16, 
+     col = "blue")
+abline(h = 4 / length(cooks_distance), col = "red", lty = 2)  
+
+# Plot Hat Values
+plot(hat_values, 
+     main = "Hat Values", 
+     xlab = "Index", 
+     ylab = "Hat Values", 
+     pch = 16, 
+     col = "blue")
+abline(h = 2 * mean(hat_values), col = "red", lty = 2)  
+
+mtext("Diagnostic Plots", outer = TRUE, line = 1, cex = 1.5)
+
+```
+
+```{r}
+# Compute leverage (hat values) 
+leverage <- hatvalues(model_transformed) 
+
+# Define the threshold for high leverage points 
+leverage_threshold <- 2 * mean(leverage) 
+
+# Plot
+plot(leverage, main = "Leverage Values",
+     xlab = "Index",
+     ylab = "Leverage",
+     pch = 16, col = "blue") 
+
+abline(h = leverage_threshold, col = "red", lwd = 2) 
+
+```
