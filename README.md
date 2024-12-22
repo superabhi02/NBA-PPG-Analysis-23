@@ -1,5 +1,4 @@
 # NBA-PPG-Predictors-2022-23
-
 This R project explores the 2022-2023 NBA season data to identify the key factors that contribute to individual players' points per game (PPG). Through data manipulation, statistical analysis, and visualization, the project focuses on revealing insights into how various player statistics correlate with scoring performance.
 
 Analysis includes:
